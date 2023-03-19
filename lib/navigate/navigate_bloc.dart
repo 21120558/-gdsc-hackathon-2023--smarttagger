@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../database_helper.dart';
+import '../database/database_helper.dart';
 
 class NavigateBloc extends Bloc<NavigateEvent, NavigateState> {
   final DatabaseHelper databaseHelper = DatabaseHelper.instance;
@@ -60,7 +60,7 @@ class NavigateBloc extends Bloc<NavigateEvent, NavigateState> {
     //   String topicName = jsonResponse['topic_name'];
 
       // Trả về tên topic
-      return "Hello";
+      return "Hiiiiiii";
     // } else {
     //   // Nếu có lỗi, trả về một giá trị mặc định
     //   return "unknown_topic";

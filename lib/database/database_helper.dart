@@ -8,13 +8,14 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart';
 
 class Topic {
-  int id;
+  int? id;
   String title;
 
   Topic({required this.id, required this.title});
 
   Map<String, dynamic> toMap() {
-    return {'id': id, 'title': title};
+    return {'id': id, 'title': title}
+      ..removeWhere((key, value) => value == null);
   }
 
   static Topic fromMap(Map<String, dynamic> map) {
@@ -53,6 +54,9 @@ class ImageModel {
 }
 
 class DatabaseHelper {
+  late final StreamController<List<Topic>> _topicStreamController =
+    StreamController<List<Topic>>.broadcast();
+
   static final _databaseName = "my_database.db";
   static final _databaseVersion = 1;
 
@@ -98,6 +102,9 @@ class DatabaseHelper {
             $columnCreatedAt TEXT NOT NULL
           )
           ''');
+
+    List<Topic> topics = await getAllTopics();
+    _topicStreamController.add(topics);
   }
 
   Future<int> insertTopic(Topic topic) async {
@@ -110,29 +117,85 @@ class DatabaseHelper {
     return await db.insert(tableImages, image.toMap());
   }
 
+  Future<String?> getTopicTitleById(int id) async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> maps = await db.query(
+      tableTopics,
+      where: '$columnId = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (maps.isNotEmpty) {
+      return maps.first[columnTitle];
+    } else {
+      return null;
+    }
+  }
+
   // Lấy danh sách tất cả các chủ đề
+  // Future<List<Topic>> getAllTopics() async {
+  //   Database db = await instance.database;
+  //   final List<Map<String, dynamic>> maps = await db.query(tableTopics);
+
+  //   return List.generate(maps.length, (i) {
+  //     return Topic.fromMap(maps[i]);
+  //   });
+  // }
+
   Future<List<Topic>> getAllTopics() async {
     Database db = await instance.database;
-    final List<Map<String, dynamic>> maps = await db.query(tableTopics);
+
+    // Subquery to get the earliest createdAt for each topic
+    String earliestCreatedAtSubquery = '''
+      SELECT MIN($tableImages.$columnCreatedAt)
+      FROM $tableImages
+      WHERE $tableImages.$columnTopicId = $tableTopics.$columnId
+    ''';
+
+    // Query to get all topics and the earliest createdAt for each topic
+    String query = '''
+      SELECT $tableTopics.*, ($earliestCreatedAtSubquery) AS earliestCreatedAt
+      FROM $tableTopics
+      LEFT JOIN $tableImages
+      ON $tableTopics.$columnId = $tableImages.$columnTopicId
+      GROUP BY $tableTopics.$columnId
+      ORDER BY earliestCreatedAt DESC
+    ''';
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery(query);
 
     return List.generate(maps.length, (i) {
       return Topic.fromMap(maps[i]);
     });
   }
 
-  // Lấy danh sách tất cả các ảnh theo chủ đề
-  Future<List<ImageModel>> getImagesByTopicId(int topicId) async {
-    Database db = await instance.database;
-    final List<Map<String, dynamic>> maps = await db
-        .query(tableImages, where: '$columnTopicId = ?', whereArgs: [topicId]);
 
-    return List.generate(maps.length, (i) {
-      return ImageModel.fromMap(maps[i]);
-    });
-  }
+  // Lấy danh sách tất cả các ảnh theo chủ đề
+  // Future<List<ImageModel>> getImagesByTopicId(int topicId) async {
+  //   Database db = await instance.database;
+  //   final List<Map<String, dynamic>> maps = await db
+  //       .query(tableImages, where: '$columnTopicId = ?', whereArgs: [topicId]);
+
+  //   return List.generate(maps.length, (i) {
+  //     return ImageModel.fromMap(maps[i]);
+  //   });
+  // }
+
+  Future<List<ImageModel>> getImagesByTopicId(int topicId) async {
+  Database db = await instance.database;
+  final List<Map<String, dynamic>> maps = await db.query(tableImages,
+      where: '$columnTopicId = ?',
+      whereArgs: [topicId],
+      orderBy: '$columnCreatedAt DESC');
+
+  return List.generate(maps.length, (i) {
+    return ImageModel.fromMap(maps[i]);
+  });
+}
 
   Future<void> insertTopicWithImageByName(
-    String topicName, File imageFile) async {
+      String topicName, File imageFile) async {
     // Check if the topic exists
     Topic? existingTopic = await getTopicByTitle(topicName);
     Topic topic;
@@ -140,13 +203,16 @@ class DatabaseHelper {
     if (existingTopic != null) {
       topic = existingTopic;
     } else {
-      Topic newTopic = Topic(id: 0, title: topicName);
+      Topic newTopic = Topic(id: null, title: topicName);
       int topicId = await insertTopic(newTopic);
       newTopic.id = topicId;
       topic = newTopic;
     }
 
     await insertImageWithFile(topic, imageFile);
+
+    List<Topic> topics = await getAllTopics();
+    _topicStreamController.add(topics);
   }
 
   // Hàm chuyển đổi File thành ImageModel và thêm vào cơ sở dữ liệu
@@ -155,8 +221,8 @@ class DatabaseHelper {
     String imagePath = await _saveImageToFileSystem(imageFile);
     // Tạo đối tượng ImageModel
     ImageModel imageModel = ImageModel(
-      id: null, 
-      topicId: topic.id,
+      id: null,
+      topicId: topic.id!,
       path: imagePath,
       createdAt: DateTime.now(),
     );
@@ -166,29 +232,20 @@ class DatabaseHelper {
 
   // Hàm lưu ảnh vào bộ nhớ thiết bị và trả về đường dẫn
   Future<String> _saveImageToFileSystem(File imageFile) async {
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final path = join(directory.path, fileName);
+    final directory = await getApplicationDocumentsDirectory();
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final path = join(directory.path, fileName);
 
-      final buffer = await imageFile.readAsBytes();
-      await File(path).writeAsBytes(buffer);
+    final buffer = await imageFile.readAsBytes();
+    await File(path).writeAsBytes(buffer);
 
-      return path;
-  }
-
-  Stream<List<Topic>> topicStream() async* {
-    while (true) {
-      List<Topic> topics = await getAllTopics();
-      yield topics;
-      await Future.delayed(
-          Duration(seconds: 5)); // Update interval, can be adjusted
-    }
+    return path;
   }
 
   Future<Topic?> getTopicByTitle(String title) async {
     Database db = await instance.database;
-    List<Map<String, dynamic>> maps = await db.query(tableTopics,
-        where: '$columnTitle = ?', whereArgs: [title]);
+    List<Map<String, dynamic>> maps = await db
+        .query(tableTopics, where: '$columnTitle = ?', whereArgs: [title]);
 
     if (maps.isNotEmpty) {
       return Topic.fromMap(maps.first);
@@ -201,5 +258,32 @@ class DatabaseHelper {
     Database db = await instance.database;
     await db.delete(tableImages);
     await db.delete(tableTopics);
+  }
+
+  // Stream<List<Topic>> topicStream() async* {
+  //   while (true) {
+  //     List<Topic> topics = await getAllTopics();
+  //     yield topics;
+  //     await Future.delayed(
+  //         Duration(seconds: 5)); // Update interval, can be adjusted
+  //   }
+  // }
+
+  Stream<List<Topic>> topicStream() {
+    return _topicStreamController.stream;
+  }
+
+  Stream<List<ImageModel>> imageStream(int topicId) async* {
+    while (true) {
+      List<ImageModel> images = await getImagesByTopicId(topicId);
+      yield images;
+      await Future.delayed(
+          Duration(seconds: 5)); // Khoảng thời gian cập nhật, có thể điều chỉnh
+    }
+  }
+
+  Future<void> initialize() async {
+    List<Topic> topics = await getAllTopics();
+    _topicStreamController.add(topics);
   }
 }
