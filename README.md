@@ -9,6 +9,6 @@ Inside the lib/navigate/navigate_bloc.dart folder, there is a variable called AP
 * Step 1: `flutter package get`
 * Step 2: `flutter run`
 
-## Model AI
-* Step 1: `pip install -r requirements.txt'
+### Model AI
+* Step 1: `pip install -r requirements.txt`
 * Step 2: `uvicorn app.main:app --reload`
