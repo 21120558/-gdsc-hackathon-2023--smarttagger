@@ -5,16 +5,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:gallery_saver/gallery_saver.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:sqflite/sqflite.dart';
 import 'dart:io';
 import 'database/database_helper.dart';
 
 import 'package:learningdart/navigate/navigate_bloc.dart';
 import 'package:learningdart/navigate/navigate_event.dart';
 import 'package:learningdart/navigate/navigate_state.dart';
-
-import 'search/search_bloc.dart';
-import 'search/search_event.dart';
-import 'search/search_state.dart';
 
 import 'stream_image/topic_stream.dart';
 
@@ -31,7 +28,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(Duration(microseconds: 4000), () {
+    Future.delayed(Duration(seconds: 3), () {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => HomePage()),
@@ -78,51 +75,11 @@ class HomePage extends StatelessWidget {
               padding: EdgeInsets.only(top: 64, bottom: 20),
               alignment: Alignment.center,
             ),
-            BlocProvider(
-              create: (context) => SearchBloc(),
-              child: SearchForm()
-            ),
             TopicStream(dbHelper: dbHelper),
             _BarScreen(),
           ],
         ),
       ),
-    );
-  }
-}
-
-class SearchForm extends StatefulWidget {
-  @override
-  _SearchFormState createState() => _SearchFormState();
-}
-
-class _SearchFormState extends State<SearchForm> {
-  late SearchBloc _searchBloc;
-
-  @override
-  void initState() {
-    super.initState();
-    _searchBloc = BlocProvider.of<SearchBloc>(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          decoration: BoxDecoration(color: Colors.white),
-          child: TextField(
-            onChanged: (searchText) {
-              _searchBloc.add(SearchTextChanged(searchText: searchText));
-            },
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              labelText: 'Search',
-              prefixIcon: Icon(Icons.search),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

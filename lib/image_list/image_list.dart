@@ -90,7 +90,7 @@ class _ImageListWidgetState extends State<ImageListWidget> {
                       padding: EdgeInsets.only(bottom: 12, top: 12),
                       child: Text(snapshot.data ?? '',
                           style: TextStyle(
-                            fontSize: 36,
+                            fontSize: 30,
                             fontWeight: FontWeight.bold,
                             color: Color.fromRGBO(0, 0, 0, 0.7),
                           )),

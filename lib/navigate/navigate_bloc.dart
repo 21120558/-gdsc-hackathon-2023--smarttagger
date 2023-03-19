@@ -7,6 +7,14 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../database/database_helper.dart';
 
+const String API_ENDPOINT = "FASTAPI_DEPLOY_AI";
+
+extension StringExtension on String {
+  String capitalize() {
+    return "${this[0].toUpperCase()}${this.substring(1).toLowerCase()}";
+  }
+}
+
 class NavigateBloc extends Bloc<NavigateEvent, NavigateState> {
   final DatabaseHelper databaseHelper = DatabaseHelper.instance;
 
@@ -17,7 +25,8 @@ class NavigateBloc extends Bloc<NavigateEvent, NavigateState> {
       final imageFile = File(pickerFile!.path);
 
       String topicName = await sendImageToAPIAndGetTopic(imageFile);
-      await databaseHelper.insertTopicWithImageByName(topicName, imageFile);
+      await databaseHelper.insertTopicWithImageByName(
+          topicName.capitalize(), imageFile);
 
       List<Topic> list = await databaseHelper.getAllTopics();
       print(list.length);
@@ -29,7 +38,8 @@ class NavigateBloc extends Bloc<NavigateEvent, NavigateState> {
       final imageFile = File(pickerFile!.path);
 
       String topicName = await sendImageToAPIAndGetTopic(imageFile);
-      await databaseHelper.insertTopicWithImageByName(topicName, imageFile);
+      await databaseHelper.insertTopicWithImageByName(
+          topicName.capitalize(), imageFile);
 
       List<Topic> list = await databaseHelper.getAllTopics();
       print(list.length);
@@ -38,32 +48,25 @@ class NavigateBloc extends Bloc<NavigateEvent, NavigateState> {
   }
 
   Future<String> sendImageToAPIAndGetTopic(File imageFile) async {
-    // String apiUrl = "your_api_url_here";
-    // Uri uri = Uri.parse(apiUrl);
+    Uri uri = Uri.parse(API_ENDPOINT);
+    http.MultipartRequest request = http.MultipartRequest('POST', uri);
 
-    // // Tạo multipart request
-    // http.MultipartRequest request = http.MultipartRequest('POST', uri);
+    request.files
+        .add(await http.MultipartFile.fromPath('image', imageFile.path));
 
-    // // Đính kèm ảnh vào request
-    // request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+    http.StreamedResponse response = await request.send();
 
-    // // Gửi request
-    // http.StreamedResponse response = await request.send();
+    if (response.statusCode == 200) {
+      String result = await response.stream.bytesToString();
+      Map<String, dynamic> jsonResponse = jsonDecode(result);
 
-    // // Kiểm tra kết quả trả về
-    // if (response.statusCode == 200) {
-    //   // Lấy kết quả trả về dạng JSON
-    //   String result = await response.stream.bytesToString();
-    //   Map<String, dynamic> jsonResponse = jsonDecode(result);
+      List<dynamic> resultList = jsonResponse["result"];
 
-    //   // Lấy tên topic từ kết quả trả về
-    //   String topicName = jsonResponse['topic_name'];
+      List<String> resultStrings = resultList.map((e) => e.toString()).toList();
 
-      // Trả về tên topic
-      return "Hiiiiiii";
-    // } else {
-    //   // Nếu có lỗi, trả về một giá trị mặc định
-    //   return "unknown_topic";
-    // }
+      return resultStrings[0];
+    } else {
+      return "unknown_topic";
+    }
   }
 }

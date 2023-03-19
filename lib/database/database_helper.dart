@@ -278,12 +278,27 @@ class DatabaseHelper {
       List<ImageModel> images = await getImagesByTopicId(topicId);
       yield images;
       await Future.delayed(
-          Duration(seconds: 5)); // Khoảng thời gian cập nhật, có thể điều chỉnh
+          Duration(seconds: 5));
     }
   }
 
   Future<void> initialize() async {
     List<Topic> topics = await getAllTopics();
     _topicStreamController.add(topics);
+  }
+
+    Future<void> deleteTopicByTitle(String title) async {
+    Database db = await instance.database;
+
+    Topic? topic = await getTopicByTitle(title);
+
+    if (topic != null) {
+      await db.delete(tableImages, where: '$columnTopicId = ?', whereArgs: [topic.id]);
+
+      await db.delete(tableTopics, where: '$columnId = ?', whereArgs: [topic.id]);
+
+      List<Topic> topics = await getAllTopics();
+      _topicStreamController.add(topics);
+    }
   }
 }
